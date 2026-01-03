@@ -15,18 +15,22 @@ jobs:
           fetch-depth: 0
 
       - name: Json/Structure Validation
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
+          git fetch origin main:main || true
+          
           for dir in $(find pages/ -maxdepth 1 -mindepth 1 -type d ! -name "_template"); do
             FOLDER_NAME=$(basename "$dir")
             CONFIG_PATH="$dir/config.json"
+            
+            echo "--- Checking folder: $FOLDER_NAME ---"
 
-            echo "--- cheching folder: $FOLDER_NAME ---"
-
-            if git show origin/main:pages/$FOLDER_NAME/config.json > /dev/null 2>&1; then
-
-              EXISTING_OWNER=$(git show origin/main:pages/$FOLDER_NAME/config.json | jq -r '.author.github // .author.name')
+            if git show main:pages/$FOLDER_NAME/config.json > /dev/null 2>&1; then
+              EXISTING_OWNER=$(git show main:pages/$FOLDER_NAME/config.json | jq -r '.author.github // .author.name')
+              
               if [ "$EXISTING_OWNER" != "$PR_AUTHOR" ]; then
-                echo "::error::Access Denied! Only $EXISTING_OWNER can modify the folder $FOLDER_NAME and you are $PR_AUTHOR :/"
+                echo "::error::Access Denied! Only $EXISTING_OWNER can modify the folder $FOLDER_NAME. (You are $PR_AUTHOR)"
                 exit 1
               fi
             fi
@@ -44,44 +48,23 @@ jobs:
             NAME=$(jq -r '.name' "$CONFIG_PATH")
             AUTH_NAME=$(jq -r '.author.name' "$CONFIG_PATH")
             AUTH_URL=$(jq -r '.author.url' "$CONFIG_PATH")
-            AUTH_PFP=$(jq -r '.author.pfp // empty' "$CONFIG_PATH")
-            CARD_COLOR=$(jq -r '."cardColor" // empty' "$CONFIG_PATH")
 
             if [ "$ROUTE" != "/$FOLDER_NAME" ]; then
-              echo "::error file=$CONFIG_PATH::Route '$ROUTE' is not corrisponding to the folder name '/$FOLDER_NAME'"
+              echo "::error file=$CONFIG_PATH::Route '$ROUTE' non corrisponde al nome cartella '/$FOLDER_NAME'"
               exit 1
             fi
 
             if [ "$NAME" == "null" ] || [ -z "$NAME" ]; then
-              echo "::error file=$CONFIG_PATH::'name' param is empty or missing."
-              exit 1
-            fi
-
-            if [ "$AUTH_NAME" == "null" ] || [ -z "$AUTH_NAME" ]; then
-              echo "::error file=$CONFIG_PATH::author name (author.name) param is empty or missing."
+              echo "::error file=$CONFIG_PATH::Il campo 'name' è vuoto o mancante."
               exit 1
             fi
 
             if [[ ! "$AUTH_URL" =~ ^https?:// ]]; then
-              echo "::error file=$CONFIG_PATH::author url (author.url) param must be a valid url starting with http:// or https://."
+              echo "::error file=$CONFIG_PATH::L'URL autore deve iniziare con http:// o https://."
               exit 1
             fi
 
-            if [ -n "$AUTH_PFP" ] && [ "$AUTH_PFP" != "null" ]; then
-              if [[ ! "$AUTH_PFP" =~ ^https?:// ]]; then
-                echo "::error file=$CONFIG_PATH::author pfp (author.pfp), if provided, must be a valid URL."
-                exit 1
-              fi
-            fi
-
-            if [ -n "$CARD_COLOR" ] && [ "$CARD_COLOR" != "null" ]; then
-              if [[ ! "$CARD_COLOR" =~ ^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$ ]]; then
-                echo "::error file=$CONFIG_PATH::cardColor '$CARD_COLOR' is not a valid HEX color (es: #ffffff or #fff)."
-                exit 1
-              fi
-            fi
-
-            echo "✅ validation completed for $FOLDER_NAME."
+            echo "✅ Validazione completata per $FOLDER_NAME."
           done
 
       - name: Post Comment on Failure
@@ -93,5 +76,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "⚠️ **Validation Failed!**\n\nHi! It looks like there is an error in your folder structure or in the `config.json` file.\n\n**What to do now:**\n1. Click on **'Details'** below or go to the **'Files changed'** tab.\n2. Look for the red error messages explaining what is wrong (e.g., incorrect route, invalid color, etc.).\n3. Fix the file, commit, and push your changes. This Pull Request will update automatically!"
+              body: "⚠️ **Validazione Fallita!**\n\nHai provato a modificare una cartella non tua o ci sono errori nel file `config.json`.\n\nControlla i messaggi rossi nei log per i dettagli."
             })
