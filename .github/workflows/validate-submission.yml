@@ -111,6 +111,25 @@ jobs:
             
             echo "✅ Validation successful for $FOLDER_NAME."
           done
+      
+      - name: Post Comment on Success
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const readmeUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/README.md`;
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ **Validation Successful!**
+
+            Hi @${context.payload.pull_request.user.login}, your submission has passed all automatic checks. 
+            
+            Please wait for a **staff member** to review and approve your Pull Request. We will merge it as soon as possible!
+            })
 
       - name: Post Comment on Failure
         if: failure()
