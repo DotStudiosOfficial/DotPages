@@ -11,21 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Json/Structure Validation
         run: |
           for dir in $(find pages/ -maxdepth 1 -mindepth 1 -type d ! -name "_template"); do
             FOLDER_NAME=$(basename "$dir")
             CONFIG_PATH="$dir/config.json"
-            
+
             echo "--- cheching folder: $FOLDER_NAME ---"
 
-            PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-            EXISTING_AUTHOR=$(git show origin/main:pages/$FOLDER_NAME/config.json | jq -r '.github_username')
+            if git show origin/main:pages/$FOLDER_NAME/config.json > /dev/null 2>&1; then
 
-            if [ "$EXISTING_AUTHOR" != "null" ] && [ "$EXISTING_AUTHOR" != "$PR_AUTHOR" ]; then
-              echo "::error::Access Denied! Only $EXISTING_AUTHOR can modify the folder $FOLDER_NAME."
-              exit 1
+              EXISTING_OWNER=$(git show origin/main:pages/$FOLDER_NAME/config.json | jq -r '.author.github // .author.name')
+              if [ "$EXISTING_OWNER" != "$PR_AUTHOR" ]; then
+                echo "::error::Access Denied! Only $EXISTING_OWNER can modify the folder $FOLDER_NAME and you are $PR_AUTHOR :/"
+                exit 1
+              fi
             fi
 
             if [ ! -f "$CONFIG_PATH" ]; then
