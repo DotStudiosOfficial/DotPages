@@ -31,7 +31,7 @@ pages/
 {
   "name": "My Page Name",
   "route": "/your-my-name",
-  "cardColor": "#6366f1",
+  "cardColor": "#293cce",
   "author": {
     "name": "Your Name",
     "url": "https://yourwebsite.com",
