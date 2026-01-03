@@ -58,7 +58,6 @@ jobs:
               fi
             fi
 
-            # 3. VALIDAZIONE JSON (Solo per nuovi inserimenti o modifiche)
             CONFIG_PATH="pages/$FOLDER_NAME/config.json"
             if [ ! -f "$CONFIG_PATH" ]; then
               echo "::error file=$CONFIG_PATH::config.json file is missing."
@@ -72,14 +71,12 @@ jobs:
             AUTH_URL=$(jq -r '.author.url' "$CONFIG_PATH")
             AUTH_PFP=$(jq -r '.author.pfp // empty' "$CONFIG_PATH")
             
-            # Uniqueness Name Check
             DUPLICATE_NAME=$(find pages/ -maxdepth 2 -name "config.json" ! -path "$CONFIG_PATH" -exec jq -r '.name' {} + | grep -Fx "$NAME" || true)
             if [ -n "$DUPLICATE_NAME" ]; then
               echo "::error file=$CONFIG_PATH::The name '$NAME' is already taken."
               exit 1
             fi
 
-            # Validation Rules
             if [ "$ROUTE" != "/$FOLDER_NAME" ]; then
               echo "::error file=$CONFIG_PATH::Route '$ROUTE' must match folder '/$FOLDER_NAME'."
               exit 1
