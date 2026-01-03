@@ -35,7 +35,7 @@ pages/
   "author": {
     "name": "Your Name",
     "url": "https://yourwebsite.com",
-    "pfp": "https://github.com/your-username.png"
+    "pfp": "https://yourwebsite.com/your-pfp.png"
   }
 }
 ``` 
