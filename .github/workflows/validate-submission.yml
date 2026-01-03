@@ -28,41 +28,80 @@ jobs:
           CHANGED_FOLDERS=$(git diff --name-only main...HEAD | grep '^pages/' | cut -d/ -f2 | sort -u | grep -v '^_template' || true)
 
           if [ -z "$CHANGED_FOLDERS" ]; then
-            echo "Nessuna modifica rilevata nelle cartelle di pages/. Salto la validazione."
+            echo "No changes detected in pages/ folders. Skipping validation."
             exit 0
           fi
 
           for FOLDER_NAME in $CHANGED_FOLDERS; do
-            echo "--- Analisi cartella: $FOLDER_NAME ---"
-
+            echo "--- Analyzing folder: $FOLDER_NAME ---"
+            
             if git ls-tree -d main pages/$FOLDER_NAME > /dev/null 2>&1; then
-              
+              # Ottiene il proprietario originale (primo commit assoluto)
               FIRST_OWNER=$(gh api "repos/${{ github.repository }}/commits?path=pages/$FOLDER_NAME&sha=main" --jq '.[-1].author.login')
 
-              echo "Proprietario originale rilevato: $FIRST_OWNER"
-              echo "Autore della Pull Request: $PR_AUTHOR"
-
               if [ "$FIRST_OWNER" != "null" ] && [ "$FIRST_OWNER" != "$PR_AUTHOR" ]; then
-                echo "::error::Accesso Negato! La cartella '$FOLDER_NAME' appartiene a $FIRST_OWNER. Tu sei $PR_AUTHOR."
+                echo "::error::Access Denied! Folder '$FOLDER_NAME' belongs to $FIRST_OWNER and you are $PR_AUTHOR :/"
                 exit 1
               fi
-            else
-              echo "Nuova cartella rilevata. Creazione permessa."
             fi
 
             CONFIG_PATH="pages/$FOLDER_NAME/config.json"
             if [ ! -f "$CONFIG_PATH" ]; then
-              echo "::error file=$CONFIG_PATH::Il file config.json è mancante."
+              echo "::error file=$CONFIG_PATH::config.json file is missing."
               exit 1
             fi
 
             ROUTE=$(jq -r '.route' "$CONFIG_PATH")
-            if [ "$ROUTE" != "/$FOLDER_NAME" ]; then
-              echo "::error file=$CONFIG_PATH::La route '$ROUTE' nel JSON non corrisponde al nome cartella '/$FOLDER_NAME'."
+            NAME=$(jq -r '.name' "$CONFIG_PATH")
+            AUTH_NAME=$(jq -r '.author.name' "$CONFIG_PATH")
+            CARD_COLOR=$(jq -r '.cardColor // empty' "$CONFIG_PATH")
+            AUTH_URL=$(jq -r '.author.url' "$CONFIG_PATH")
+            AUTH_PFP=$(jq -r '.author.pfp // empty' "$CONFIG_PATH")
+            
+            DUPLICATE_NAME=$(find pages/ -maxdepth 2 -name "config.json" ! -path "$CONFIG_PATH" -exec jq -r '.name' {} + | grep -Fx "$NAME" || true)
+            
+            if [ -n "$DUPLICATE_NAME" ]; then
+              echo "::error file=$CONFIG_PATH::The name '$NAME' is already taken by another project. Please choose a unique name."
               exit 1
             fi
+
+            if [ "$ROUTE" != "/$FOLDER_NAME" ]; then
+              echo "::error file=$CONFIG_PATH::The route '$ROUTE' in the JSON does not match the folder name '/$FOLDER_NAME'."
+              exit 1
+            fi
+
+            if [ "$NAME" == "null" ] || [ -z "$NAME" ]; then
+              echo "::error file=$CONFIG_PATH::The 'name' field is empty or missing."
+              exit 1
+            fi
+
+            if [ -n "$CARD_COLOR" ] && [ "$CARD_COLOR" != "null" ]; then
+              if [[ ! "$CARD_COLOR" =~ ^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$ ]]; then
+                echo "::error file=$CONFIG_PATH::cardColor '$CARD_COLOR' is not a valid HEX color (e.g., #ffffff or #fff)."
+                exit 1
+              fi
+            fi
+
+            if [ "$AUTH_NAME" == "null" ] || [ -z "$AUTH_NAME" ]; then
+              echo "::error file=$CONFIG_PATH::The 'author.name' field is empty or missing."
+              exit 1
+            fi
+
+            if [ -n "$AUTH_PFP" ] && [ "$AUTH_PFP" != "null" ]; then
+              if [[ ! "$AUTH_PFP" =~ ^https?:// ]]; then
+                echo "::error file=$CONFIG_PATH::'author.pfp' must be a valid URL (http/https)."
+                exit 1
+              fi
+            fi
+
+            if [ -n "$AUTH_URL" ] && [ "$AUTH_URL" != "null" ]; then
+              if [[ ! "$AUTH_URL" =~ ^https?:// ]]; then
+                echo "::error file=$CONFIG_PATH::'author.url' must be a valid URL (http/https)."
+                exit 1
+              fi
+            fi
             
-            echo "✅ Validazione completata con successo per $FOLDER_NAME."
+            echo "✅ Validation successful for $FOLDER_NAME."
           done
 
       - name: Post Comment on Failure
@@ -70,9 +109,20 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const readmeUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/README.md`;
+            
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "⚠️ **Validazione Fallita!**\n\nCiao @${{ github.event.pull_request.user.login }}, il controllo automatico ha riscontrato un problema:\n\n1. **Proprietà**: Potresti aver cercato di modificare una cartella creata da un altro utente.\n2. **Configurazione**: La `route` nel tuo `config.json` potrebbe non corrispondere al nome della cartella.\n\nControlla i messaggi d'errore (rossi) nei log della Action per i dettagli specifici."
+              body: `⚠️ **Validation Failed!**
+
+            Hi @${context.payload.pull_request.user.login}, your submission could not be processed for the following reasons:
+            - You might be trying to modify a folder created by another user.
+            - There are errors in your folder structure or \`config.json\` format.
+
+            ---
+            📖 **[Check the correct formatting here](${readmeUrl})** (Documentation)
+            🔍 **[View the error logs](${runUrl})** (Technical details)`
             })
