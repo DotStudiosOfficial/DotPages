@@ -128,7 +128,7 @@ jobs:
 
             Hi @${context.payload.pull_request.user.login}, your submission has passed all automatic checks. 
             
-            Please wait for a **staff member** to review and approve your Pull Request. We will merge it as soon as possible!
+            Please wait for a **staff member** to review and approve your Pull Request. We will merge it as soon as possible!`
             })
 
       - name: Post Comment on Failure
