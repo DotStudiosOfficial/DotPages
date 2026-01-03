@@ -1,17 +1,21 @@
 name: Dot Pages - site upload validation
-on: [pull_request]
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 permissions:
   pull-requests: write
-  contents: read
   issues: write
+  contents: read
 
 jobs:
   check-submission:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Json/Structure Validation
@@ -24,7 +28,7 @@ jobs:
           CHANGED_FOLDERS=$(git diff --name-only main...HEAD | grep '^pages/' | cut -d/ -f2 | sort -u | grep -v '^_template' || true)
 
           if [ -z "$CHANGED_FOLDERS" ]; then
-            echo "Nessuna modifica nelle pagine. Salto i controlli."
+            echo "Nessuna modifica rilevata nelle cartelle di pages/. Salto la validazione."
             exit 0
           fi
 
@@ -33,30 +37,32 @@ jobs:
 
             if git ls-tree -d main pages/$FOLDER_NAME > /dev/null 2>&1; then
               
-              LAST_OWNER=$(gh api "repos/${{ github.repository }}/commits?path=pages/$FOLDER_NAME&sha=main&per_page=1" --jq '.[0].author.login')
+              FIRST_OWNER=$(gh api "repos/${{ github.repository }}/commits?path=pages/$FOLDER_NAME&sha=main" --jq '.[-1].author.login')
 
-              echo "Proprietario rilevato su main: $LAST_OWNER"
-              echo "Autore attuale della PR: $PR_AUTHOR"
+              echo "Proprietario originale rilevato: $FIRST_OWNER"
+              echo "Autore della Pull Request: $PR_AUTHOR"
 
-              if [ "$LAST_OWNER" != "null" ] && [ "$LAST_OWNER" != "$PR_AUTHOR" ]; then
-                echo "::error::Accesso Negato! La cartella '$FOLDER_NAME' appartiene a $LAST_OWNER. Tu sei $PR_AUTHOR."
+              if [ "$FIRST_OWNER" != "null" ] && [ "$FIRST_OWNER" != "$PR_AUTHOR" ]; then
+                echo "::error::Accesso Negato! La cartella '$FOLDER_NAME' appartiene a $FIRST_OWNER. Tu sei $PR_AUTHOR."
                 exit 1
               fi
             else
-              echo "Nuova cartella rilevata. Creazione permessa per $PR_AUTHOR."
+              echo "Nuova cartella rilevata. Creazione permessa."
             fi
 
             CONFIG_PATH="pages/$FOLDER_NAME/config.json"
             if [ ! -f "$CONFIG_PATH" ]; then
-              echo "::error file=$CONFIG_PATH::config.json mancante."
+              echo "::error file=$CONFIG_PATH::Il file config.json è mancante."
               exit 1
             fi
 
             ROUTE=$(jq -r '.route' "$CONFIG_PATH")
             if [ "$ROUTE" != "/$FOLDER_NAME" ]; then
-              echo "::error file=$CONFIG_PATH::La route '$ROUTE' deve essere '/$FOLDER_NAME'."
+              echo "::error file=$CONFIG_PATH::La route '$ROUTE' nel JSON non corrisponde al nome cartella '/$FOLDER_NAME'."
               exit 1
             fi
+            
+            echo "✅ Validazione completata con successo per $FOLDER_NAME."
           done
 
       - name: Post Comment on Failure
@@ -64,9 +70,9 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "⚠️ **Protezione Cartelle Attiva**\n\nSembra che tu stia cercando di modificare una cartella creata da un altro utente. Solo il proprietario originale può apportare modifiche a quella specifica cartella."
+              body: "⚠️ **Validazione Fallita!**\n\nCiao @${{ github.event.pull_request.user.login }}, il controllo automatico ha riscontrato un problema:\n\n1. **Proprietà**: Potresti aver cercato di modificare una cartella creata da un altro utente.\n2. **Configurazione**: La `route` nel tuo `config.json` potrebbe non corrispondere al nome della cartella.\n\nControlla i messaggi d'errore (rossi) nei log della Action per i dettagli specifici."
             })
