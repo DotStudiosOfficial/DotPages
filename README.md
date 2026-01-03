@@ -26,15 +26,15 @@ pages/
 ```
 
 **📝 `config.json` example**
-```json
+```js
 {
   "name": "My Page Name",
-  "route": "/your-my-name",             <-- must be the same name of the folder
-  "cardColor": "#6366f1", (optional)    <-- must be a valid hexadecimal color
+  "route": "/your-my-name",             //<-- must be the same name of the folder
+  "cardColor": "#6366f1", //(optional)  <-- must be a valid hexadecimal color
   "author": {
     "name": "Your Name",
-    "url": "https://github.com/your-username", (optional)     <-- must be a valid url
-    "pfp": "https://github.com/your-username.png" (optional)  <-- must be a valid url
+    "url": "https://github.com/your-username", //(optional)     <-- must be a valid url
+    "pfp": "https://github.com/your-username.png" //(optional)  <-- must be a valid url
   }
 }
 ```
