@@ -16,44 +16,47 @@ jobs:
 
       - name: Json/Structure Validation
         env:
+          GH_TOKEN: ${{ github.token }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           git fetch origin main:main || true
-          
+
           CHANGED_FOLDERS=$(git diff --name-only main...HEAD | grep '^pages/' | cut -d/ -f2 | sort -u | grep -v '^_template' || true)
 
           if [ -z "$CHANGED_FOLDERS" ]; then
-            echo "no folders changed. skipping validation"
+            echo "Nessuna modifica nelle pagine. Salto i controlli."
             exit 0
           fi
 
           for FOLDER_NAME in $CHANGED_FOLDERS; do
-            dir="pages/$FOLDER_NAME"
-            CONFIG_PATH="$dir/config.json"
-            
-            echo "--- Checking modified folder: $FOLDER_NAME ---"
+            echo "--- Analisi cartella: $FOLDER_NAME ---"
 
-            if git show main:pages/$FOLDER_NAME/config.json > /dev/null 2>&1; then
-              EXISTING_OWNER=$(git show main:pages/$FOLDER_NAME/config.json | jq -r '.author.github // .author.name')
+            if git ls-tree -d main pages/$FOLDER_NAME > /dev/null 2>&1; then
               
-              if [ "$EXISTING_OWNER" != "$PR_AUTHOR" ]; then
-                echo "::error::Access Denied! Only $EXISTING_OWNER can modify the folder $FOLDER_NAME. (You are $PR_AUTHOR)"
+              LAST_OWNER=$(gh api "repos/${{ github.repository }}/commits?path=pages/$FOLDER_NAME&sha=main&per_page=1" --jq '.[0].author.login')
+
+              echo "Proprietario rilevato su main: $LAST_OWNER"
+              echo "Autore attuale della PR: $PR_AUTHOR"
+
+              if [ "$LAST_OWNER" != "null" ] && [ "$LAST_OWNER" != "$PR_AUTHOR" ]; then
+                echo "::error::Accesso Negato! La cartella '$FOLDER_NAME' appartiene a $LAST_OWNER. Tu sei $PR_AUTHOR."
                 exit 1
               fi
+            else
+              echo "Nuova cartella rilevata. Creazione permessa per $PR_AUTHOR."
             fi
 
+            CONFIG_PATH="pages/$FOLDER_NAME/config.json"
             if [ ! -f "$CONFIG_PATH" ]; then
-              echo "::error file=$CONFIG_PATH::config.json is missing"
+              echo "::error file=$CONFIG_PATH::config.json mancante."
               exit 1
             fi
-            
+
             ROUTE=$(jq -r '.route' "$CONFIG_PATH")
             if [ "$ROUTE" != "/$FOLDER_NAME" ]; then
-              echo "::error file=$CONFIG_PATH::Route '$ROUTE' non corrisponde alla cartella '/$FOLDER_NAME'"
+              echo "::error file=$CONFIG_PATH::La route '$ROUTE' deve essere '/$FOLDER_NAME'."
               exit 1
             fi
-
-            echo "✅ Validation successful for $FOLDER_NAME."
           done
 
       - name: Post Comment on Failure
@@ -65,5 +68,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "⚠️ **Validazione Fallita!**\n\nHai provato a modificare una cartella non tua o ci sono errori nel file `config.json`.\n\nControlla i dettagli nei log cliccando su 'Details'."
+              body: "⚠️ **Protezione Cartelle Attiva**\n\nSembra che tu stia cercando di modificare una cartella creata da un altro utente. Solo il proprietario originale può apportare modifiche a quella specifica cartella."
             })
