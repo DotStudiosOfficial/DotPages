@@ -25,23 +25,24 @@ pages/
         ... optional    <-- optional files (css, js, images...)
 ```
 
-**📝 `config.json` example**
-```js
+**📝 `config.json` example**  
+*The fields `cardColor`, `author.url`, and `author.pfp` are optional. You can either leave them as empty strings ("") or omit them from the JSON file entirely.*
+```json
 {
   "name": "My Page Name",
-  "route": "/your-my-name",             //<-- must be the same name of the folder
-  "cardColor": "#6366f1", //(optional)  <-- must be a valid hexadecimal color
+  "route": "/your-my-name",
+  "cardColor": "#6366f1",
   "author": {
     "name": "Your Name",
-    "url": "https://github.com/your-username", //(optional)     <-- must be a valid url
-    "pfp": "https://github.com/your-username.png" //(optional)  <-- must be a valid url
+    "url": "https://yourwebsite.com",
+    "pfp": "https://github.com/your-username.png"
   }
 }
-```
+``` 
 
 **⚠️ Warning:** Do not modify or delete other people's pages; doing so will result in your Pull Request being instantly invalidated.
 
 
 
-3. **Submit** your Pull Request  
-Push your changes to your fork and open a Pull Request to our main branch.
+**3. Submit** your Pull Request  
+Push your changes to your fork and open a **Pull Request** to our main branch.
