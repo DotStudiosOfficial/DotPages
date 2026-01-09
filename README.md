@@ -30,7 +30,7 @@ pages/
 ```json
 {
   "name": "My Page Name",
-  "route": "/your-my-name",
+  "route": "/your-name",
   "cardColor": "#293cce",
   "author": {
     "name": "Your Name",
